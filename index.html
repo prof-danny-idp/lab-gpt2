@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratório GPT-2 — Playground de Completion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4efe6;
+    --paper-dark: #e8e0d2;
+    --ink: #1c1a17;
+    --ink-soft: #4a463f;
+    --accent: #b5371f;
+    --accent-soft: #d4654f;
+    --line: #cabfac;
+    --grid: rgba(28, 26, 23, 0.05);
+    --green: #3d6b3a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color: var(--ink);
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  /* ── Cabeçalho ── */
+  header {
+    border-bottom: 3px double var(--ink);
+    padding-bottom: 1.2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 1.5rem;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .mascot {
+    flex-shrink: 0;
+    width: clamp(110px, 22vw, 160px);
+    height: auto;
+    filter: drop-shadow(4px 6px 0 var(--paper-dark));
+    animation: bob 3s ease-in-out infinite;
+  }
+  @keyframes bob {
+    50% { transform: translateY(-8px); }
+  }
+  .prof-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 0.4rem 0.8rem;
+    border-radius: 5px;
+    margin-top: 0.9rem;
+  }
+  .prof-badge::before { content: "🐾"; }
+  @media (max-width: 560px) {
+    header { flex-direction: column-reverse; align-items: center; text-align: center; }
+    .header-text { text-align: center; }
+    .stamp { position: static; display: inline-block; margin-bottom: 0.8rem; transform: rotate(-3deg); }
+  }
+  .tag {
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 6vw, 3.4rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .sub {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-top: 0.8rem;
+    max-width: 60ch;
+  }
+  .stamp {
+    position: absolute;
+    top: -0.5rem; right: 0;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    padding: 0.35rem 0.6rem;
+    transform: rotate(6deg);
+    border-radius: 3px;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* ── Status do modelo ── */
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.75rem;
+    background: var(--paper-dark);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 0.7rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #b0a890; flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.loading { background: #d99a2b; animation: pulse 1s infinite; }
+  .dot.ready { background: var(--green); }
+  .dot.error { background: var(--accent); }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+  .bar-track {
+    flex: 1; height: 4px; background: var(--line);
+    border-radius: 2px; overflow: hidden; display: none;
+  }
+  .bar-fill { height: 100%; width: 0%; background: var(--green); transition: width 0.2s; }
+
+  /* ── Editor ── */
+  .editor-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--ink-soft); margin-bottom: 0.5rem; display: block;
+  }
+  #prompt {
+    width: 100%;
+    min-height: 180px;
+    background: #fffdf8;
+    border: 1.5px solid var(--ink);
+    border-radius: 6px;
+    padding: 1.1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--ink);
+    resize: vertical;
+    box-shadow: 4px 4px 0 var(--paper-dark);
+  }
+  #prompt:focus { outline: none; border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent-soft); }
+  /* texto gerado destacado */
+  #prompt.has-generated::selection { background: var(--accent-soft); }
+
+  /* ── Parâmetros ── */
+  .params {
+    background: var(--paper-dark);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1.3rem;
+    margin: 1.5rem 0;
+  }
+  .params-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+  }
+  .params-note { font-size: 0.72rem; color: var(--ink-soft); margin-bottom: 1.2rem; }
+  .param-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.3rem;
+  }
+  .param label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.78rem; font-weight: 500; margin-bottom: 0.4rem;
+  }
+  .param .val {
+    font-weight: 700; color: var(--accent);
+    background: #fffdf8; padding: 0.05rem 0.4rem; border-radius: 3px;
+    border: 1px solid var(--line);
+  }
+  .param .hint { font-size: 0.66rem; color: var(--ink-soft); margin-top: 0.35rem; }
+  input[type=range] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 4px; background: var(--line); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ink); border: 3px solid var(--paper);
+    cursor: pointer; box-shadow: 0 0 0 1px var(--ink);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ink); border: 3px solid var(--paper);
+    cursor: pointer; box-shadow: 0 0 0 1px var(--ink);
+  }
+
+  /* ── Botões ── */
+  .actions { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+  button {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    padding: 0.85rem 1.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1.5px solid var(--ink);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  #run {
+    background: var(--accent); color: var(--paper);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  #run:hover:not(:disabled) { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--ink); }
+  #run:active:not(:disabled) { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  #run:disabled { opacity: 0.5; cursor: not-allowed; }
+  #clear {
+    background: transparent; color: var(--ink);
+  }
+  #clear:hover { background: var(--paper-dark); }
+
+  /* ── Rodapé ── */
+  footer {
+    margin-top: 2.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+  }
+  footer a { color: var(--accent); }
+  .warn {
+    background: #fbf3e0; border-left: 3px solid #d99a2b;
+    padding: 0.7rem 1rem; font-size: 0.74rem; border-radius: 0 5px 5px 0;
+    margin-bottom: 1.5rem; color: var(--ink-soft);
+  }
+  .spin { display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="stamp">MODELO<br>BASE</div>
+    <div class="header-text">
+      <div class="tag">Laboratório de Linguagem · Atividade Prática</div>
+      <h1>GPT-2 <em>Playground</em></h1>
+      <p class="sub">
+        Escreva um trecho de texto e observe como o modelo o <strong>completa</strong>.
+        Lembre-se: este é um modelo base de 2019 — ele continua o texto, não responde perguntas.
+        Ajuste os parâmetros e veja como eles mudam o comportamento.
+      </p>
+      <span class="prof-badge">Prof. Danny · IDP</span>
+    </div>
+    <img class="mascot" src="prof-danny.png" alt="Pinot, mascote do laboratório">
+  </header>
+
+  <div class="warn">
+    ⚠️ Na primeira vez, o modelo (~120 MB) é baixado e fica salvo no navegador.
+    Tudo roda <strong>localmente na sua máquina</strong> — nenhum dado é enviado a servidores.
+  </div>
+
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="status-text">Pronto para carregar. Clique em "Gerar" para iniciar.</span>
+    <div class="bar-track" id="bar-track"><div class="bar-fill" id="bar-fill"></div></div>
+  </div>
+
+  <label class="editor-label" for="prompt">Texto inicial (prompt)</label>
+  <textarea id="prompt" spellcheck="false">A inteligência artificial vai transformar a educação porque</textarea>
+
+  <div class="params">
+    <div class="params-title">Parâmetros de geração</div>
+    <div class="params-note">Passe o mouse sobre cada um para entender o efeito.</div>
+    <div class="param-grid">
+
+      <div class="param">
+        <label>Máx. de tokens <span class="val" id="v-max">60</span></label>
+        <input type="range" id="p-max" min="10" max="200" value="60" step="10">
+        <div class="hint">Quantas palavras/pedaços o modelo vai gerar.</div>
+      </div>
+
+      <div class="param">
+        <label>Temperatura <span class="val" id="v-temp">0.8</span></label>
+        <input type="range" id="p-temp" min="0.1" max="1.5" value="0.8" step="0.1">
+        <div class="hint">Baixa = previsível e repetitivo. Alta = criativo e caótico.</div>
+      </div>
+
+      <div class="param">
+        <label>Top-K <span class="val" id="v-topk">50</span></label>
+        <input type="range" id="p-topk" min="1" max="100" value="50" step="1">
+        <div class="hint">Limita a escolha às K palavras mais prováveis.</div>
+      </div>
+
+      <div class="param">
+        <label>Top-P (nucleus) <span class="val" id="v-topp">0.95</span></label>
+        <input type="range" id="p-topp" min="0.1" max="1" value="0.95" step="0.05">
+        <div class="hint">Considera só as palavras que somam P de probabilidade.</div>
+      </div>
+
+      <div class="param">
+        <label>Penalidade de repetição <span class="val" id="v-rep">1.2</span></label>
+        <input type="range" id="p-rep" min="1" max="2" value="1.2" step="0.05">
+        <div class="hint">Maior = evita repetir as mesmas palavras.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="run">▶ Gerar completion</button>
+    <button id="clear">Limpar</button>
+  </div>
+
+  <footer>
+    Construído com <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Transformers.js</a>
+    · Modelo <code>Xenova/gpt2</code> · Roda 100% no navegador, sem servidor.
+  </footer>
+
+</div>
+
+<script type="module">
+  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+
+  // Usa modelos quantizados do Hub (mais leves para o navegador)
+  env.allowLocalModels = false;
+
+  const dot       = document.getElementById('dot');
+  const statusTxt = document.getElementById('status-text');
+  const barTrack  = document.getElementById('bar-track');
+  const barFill   = document.getElementById('bar-fill');
+  const promptEl  = document.getElementById('prompt');
+  const runBtn    = document.getElementById('run');
+  const clearBtn  = document.getElementById('clear');
+
+  let generator = null;
+
+  // ── Liga sliders aos valores exibidos ──
+  const sliders = [
+    ['p-max','v-max'], ['p-temp','v-temp'], ['p-topk','v-topk'],
+    ['p-topp','v-topp'], ['p-rep','v-rep']
+  ];
+  sliders.forEach(([s, v]) => {
+    const sl = document.getElementById(s);
+    const lbl = document.getElementById(v);
+    sl.addEventListener('input', () => lbl.textContent = sl.value);
+  });
+
+  function setStatus(text, state) {
+    statusTxt.textContent = text;
+    dot.className = 'dot' + (state ? ' ' + state : '');
+  }
+
+  // ── Carrega o modelo (uma vez) com barra de progresso ──
+  async function loadModel() {
+    setStatus('Baixando modelo GPT-2… (só na primeira vez)', 'loading');
+    barTrack.style.display = 'block';
+
+    generator = await pipeline('text-generation', 'Xenova/gpt2', {
+      dtype: 'q8',          // versão quantizada e leve (resolve o erro de arquivo)
+      device: 'wasm',       // roda via WebAssembly (compatível com qualquer navegador)
+      progress_callback: (p) => {
+        if (p.status === 'progress' && p.total) {
+          const pct = Math.round((p.loaded / p.total) * 100);
+          barFill.style.width = pct + '%';
+          setStatus(`Baixando ${p.file || 'arquivos'}… ${pct}%`, 'loading');
+        }
+      }
+    });
+
+    barTrack.style.display = 'none';
+    setStatus('Modelo carregado e pronto. ✓', 'ready');
+  }
+
+  // ── Gera o texto ──
+  async function generate() {
+    const prompt = promptEl.value.trim();
+    if (!prompt) { promptEl.focus(); return; }
+
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<span class="spin">◐</span> Gerando…';
+
+    try {
+      if (!generator) await loadModel();
+
+      setStatus('Gerando texto…', 'loading');
+
+      const params = {
+        max_new_tokens: +document.getElementById('p-max').value,
+        temperature:    +document.getElementById('p-temp').value,
+        top_k:          +document.getElementById('p-topk').value,
+        top_p:          +document.getElementById('p-topp').value,
+        repetition_penalty: +document.getElementById('p-rep').value,
+        do_sample: true,
+      };
+
+      const output = await generator(prompt, params);
+      const fullText = output[0].generated_text;
+
+      // Mostra o resultado completo no editor
+      promptEl.value = fullText;
+      promptEl.classList.add('has-generated');
+      setStatus('Concluído. ✓ Edite o texto e gere novamente se quiser.', 'ready');
+
+    } catch (err) {
+      console.error(err);
+      let msg = err.message;
+      if (location.protocol === 'file:') {
+        msg += ' — DICA: abrir o arquivo direto (file://) pode falhar. Use um servidor local (ex.: "python -m http.server") ou publique no GitHub Pages.';
+      }
+      setStatus('Erro ao gerar: ' + msg, 'error');
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = '▶ Gerar completion';
+    }
+  }
+
+  runBtn.addEventListener('click', generate);
+  clearBtn.addEventListener('click', () => {
+    promptEl.value = '';
+    promptEl.classList.remove('has-generated');
+    promptEl.focus();
+  });
+
+  // Atalho: Ctrl/Cmd + Enter para gerar
+  promptEl.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
+  });
+</script>
+</body>
+</html>
