@@ -268,11 +268,11 @@
       </p>
       <span class="prof-badge">Prof. Danny · IDP</span>
     </div>
-    <img class="mascot" src="prof-danny.png" alt="Pinot, mascote do laboratório">
+    <img class="mascot" src="prof-danny.png" alt="Prof. Danny, mascote do laboratório">
   </header>
 
   <div class="warn">
-    ⚠️ Na primeira vez, o modelo (~120 MB) é baixado e fica salvo no navegador.
+    ⚠️ Na primeira vez, o modelo (~500 MB) é baixado e fica salvo no navegador (pode demorar).
     Tudo roda <strong>localmente na sua máquina</strong> — nenhum dado é enviado a servidores.
   </div>
 
@@ -336,7 +336,7 @@
 </div>
 
 <script type="module">
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2';
 
   // Usa modelos quantizados do Hub (mais leves para o navegador)
   env.allowLocalModels = false;
@@ -373,7 +373,7 @@
     barTrack.style.display = 'block';
 
     generator = await pipeline('text-generation', 'Xenova/gpt2', {
-      dtype: 'q8',          // versão quantizada e leve (resolve o erro de arquivo)
+      dtype: 'fp32',        // usa model.onnx (arquivo que existe no repositório)
       device: 'wasm',       // roda via WebAssembly (compatível com qualquer navegador)
       progress_callback: (p) => {
         if (p.status === 'progress' && p.total) {
